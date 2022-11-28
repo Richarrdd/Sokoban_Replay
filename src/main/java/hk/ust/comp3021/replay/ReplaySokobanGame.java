@@ -9,7 +9,9 @@ import hk.ust.comp3021.game.InputEngine;
 import hk.ust.comp3021.game.RenderingEngine;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static hk.ust.comp3021.utils.StringResources.*;
 
@@ -103,6 +105,9 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
 
     // TODO: add any method or field you need.
 
+
+    private static final AtomicInteger nextId = new AtomicInteger(0);
+
     /**
      * The implementation of the Runnable for each input engine thread.
      * Each input engine should run in a separate thread.
@@ -120,6 +125,7 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
     private class InputEngineRunnable implements Runnable {
         private final int index;
         private final InputEngine inputEngine;
+        private boolean exit = false;
 
         private InputEngineRunnable(int index, @NotNull InputEngine inputEngine) {
             this.index = index;
@@ -129,11 +135,58 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
         @Override
         public void run() {
             // TODO: modify this method to implement the requirements.
-            while (!shouldStop()) {
-                final var action = inputEngine.fetchAction();
-                final var result = processAction(action);
-                if (result instanceof ActionResult.Failed failed) {
-                    renderingEngine.message(failed.getReason());
+            if (mode == Mode.FREE_RACE) {
+                System.out.println("Free Race");
+                while (!shouldStop() || !exit) {
+                    synchronized (nextId) {
+                        final var action = inputEngine.fetchAction();
+                        if (action.getClass() != Exit.class) {
+                            final var result = processAction(action);
+                            if (result instanceof ActionResult.Failed failed) {
+                                renderingEngine.message(failed.getReason());
+                            }
+                        } else {
+                            exit = true;
+                            final var result = processAction(action);
+                            if (result instanceof ActionResult.Failed failed) {
+                                renderingEngine.message(failed.getReason());
+                            }
+                        }
+                    }
+                }
+            }
+            if (mode == Mode.ROUND_ROBIN) {
+                System.out.println("Round Robin");
+                try {
+                    while (!shouldStop() || !exit) {
+                        synchronized (nextId) {
+                            while (nextId.get() != index) {
+                                nextId.wait();
+                            }
+                        }
+                        final var action = inputEngine.fetchAction();
+
+
+                        if (action.getClass() != Exit.class) {
+                            final var result = processAction(action);
+                            if (result instanceof ActionResult.Failed failed) {
+                                renderingEngine.message(failed.getReason());
+                            }
+                        } else {
+                            exit = true;
+                            final var result = processAction(action);
+                            if (result instanceof ActionResult.Failed failed) {
+                                renderingEngine.message(failed.getReason());
+                            }
+                        }
+
+
+                        synchronized (nextId) {
+                            nextId.set((nextId.get() + 1) % inputEngines.size());
+                            nextId.notifyAll();
+                        }
+                    }
+                } catch (InterruptedException ignored) {
                 }
             }
         }
@@ -161,6 +214,15 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
                     .orElse(UNDO_QUOTA_UNLIMITED);
                 renderingEngine.message(undoQuotaMessage);
                 renderingEngine.render(state);
+                long temp = System.currentTimeMillis();
+                while (System.currentTimeMillis() - temp < 1000/frameRate) {
+
+                }
+//                try {
+//                    Thread.sleep(1000/frameRate);
+//                } catch (InterruptedException e) {
+//                    throw new RuntimeException(e);
+//                }
             } while (!shouldStop());
         }
     }
@@ -173,6 +235,37 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
     @Override
     public void run() {
         // TODO
+
+        List<Thread> threadList = new ArrayList<>();
+
+        RenderingEngineRunnable renderingEngine = new RenderingEngineRunnable();
+        Thread renderingEngineThread = new Thread (renderingEngine);
+
+
+        for (int i = 0; i < inputEngines.size(); i++) {
+            InputEngineRunnable inputEngine = new InputEngineRunnable(i, inputEngines.get(i));
+            Thread tempThread = new Thread(inputEngine);
+            threadList.add(tempThread);
+        }
+
+        renderingEngineThread.start();
+        for (int i = 0; i < threadList.size(); i++) {
+            threadList.get(i).start();
+        }
+
+        try {
+            renderingEngineThread.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        for (int i = 0; i < threadList.size(); i++) {
+            try {
+                threadList.get(i).join();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
 }
