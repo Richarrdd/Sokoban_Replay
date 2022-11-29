@@ -107,6 +107,18 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
 
 
     private static final AtomicInteger nextId = new AtomicInteger(0);
+    //private static int numOfInputEngines;
+    private List<Boolean> exits = new ArrayList<>();
+    //private static ArrayList exits;
+
+    private boolean allExit() {
+        for (int i = 0; i < inputEngines.size(); i++) {
+            if (exits.get(i) == false) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     /**
      * The implementation of the Runnable for each input engine thread.
@@ -127,6 +139,7 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
         private final InputEngine inputEngine;
         private boolean exit = false;
 
+
         private InputEngineRunnable(int index, @NotNull InputEngine inputEngine) {
             this.index = index;
             this.inputEngine = inputEngine;
@@ -137,7 +150,7 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
             // TODO: modify this method to implement the requirements.
             if (mode == Mode.FREE_RACE) {
                 System.out.println("Free Race");
-                while (!shouldStop() || !exit) {
+                while (!exit) {
                     synchronized (nextId) {
                         final var action = inputEngine.fetchAction();
                         if (action.getClass() != Exit.class) {
@@ -159,14 +172,25 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
                 System.out.println("Round Robin");
                 try {
                     while (!shouldStop() || !exit) {
+                        //System.out.println("Index " + index + " is " + exits.get(index));
                         synchronized (nextId) {
                             while (nextId.get() != index) {
-                                nextId.wait();
+//                                if (!exit) {
+                                  nextId.wait();
+//                                }
+//                                if (exit) {
+//                                    System.out.println("through here");
+//                                    nextId.set((nextId.get() + 1) % inputEngines.size());
+//                                    nextId.notifyAll();
+//                                }
                             }
                         }
                         final var action = inputEngine.fetchAction();
 
-
+//                        if(action instanceof Exit) {
+//                            exits.set(index,true);
+//                            break;
+//                        }
                         if (action.getClass() != Exit.class) {
                             final var result = processAction(action);
                             if (result instanceof ActionResult.Failed failed) {
@@ -174,6 +198,7 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
                             }
                         } else {
                             exit = true;
+                            exits.set(index, true);
                             final var result = processAction(action);
                             if (result instanceof ActionResult.Failed failed) {
                                 renderingEngine.message(failed.getReason());
@@ -182,7 +207,20 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
 
 
                         synchronized (nextId) {
-                            nextId.set((nextId.get() + 1) % inputEngines.size());
+//                            int count  = 1;
+//                            while ((exits[(nextId.get() + count) % inputEngines.size()])) {
+//                                count++;
+//                            }
+//                            System.out.println("count = " + count + ", nextID = " + nextId);
+//                            nextId.set((nextId.get() + count) % inputEngines.size());
+                            do {
+                                //System.out.println("ID to " + nextId.get());
+                                nextId.set((nextId.get() + 1) % inputEngines.size());
+                            } while (exits.get((nextId.get()) % inputEngines.size()));
+//                            while (exits[(nextId.get() + 1) % inputEngines.size()]) {
+//                                nextId.set((nextId.get() + 1) % inputEngines.size());
+//                            }
+                            //System.out.println(nextId.get() + "EXECUTES");
                             nextId.notifyAll();
                         }
                     }
@@ -214,16 +252,17 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
                     .orElse(UNDO_QUOTA_UNLIMITED);
                 renderingEngine.message(undoQuotaMessage);
                 renderingEngine.render(state);
-                long temp = System.currentTimeMillis();
-                while (System.currentTimeMillis() - temp < 1000/frameRate) {
-
+                long start = System.currentTimeMillis();
+                long currentTime = System.currentTimeMillis();
+                while (currentTime - start < 1000/frameRate) {
+                    currentTime = System.currentTimeMillis();
                 }
-//                try {
-//                    Thread.sleep(1000/frameRate);
-//                } catch (InterruptedException e) {
-//                    throw new RuntimeException(e);
-//                }
-            } while (!shouldStop());
+            } while (!shouldStop() || !allExit());
+            final var undoQuotaMessage = state.getUndoQuota()
+                    .map(it -> String.format(UNDO_QUOTA_TEMPLATE, it))
+                    .orElse(UNDO_QUOTA_UNLIMITED);
+            renderingEngine.message(undoQuotaMessage);
+            renderingEngine.render(state);
         }
     }
 
@@ -236,16 +275,18 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
     public void run() {
         // TODO
 
-        List<Thread> threadList = new ArrayList<>();
-
         RenderingEngineRunnable renderingEngine = new RenderingEngineRunnable();
         Thread renderingEngineThread = new Thread (renderingEngine);
-
+        List<Thread> threadList = new ArrayList<>();
+        nextId.set(0);
+        //numOfInputEngines = inputEngines.size();
 
         for (int i = 0; i < inputEngines.size(); i++) {
+            exits.add(false);
             InputEngineRunnable inputEngine = new InputEngineRunnable(i, inputEngines.get(i));
             Thread tempThread = new Thread(inputEngine);
             threadList.add(tempThread);
+            //exits.add(false);
         }
 
         renderingEngineThread.start();

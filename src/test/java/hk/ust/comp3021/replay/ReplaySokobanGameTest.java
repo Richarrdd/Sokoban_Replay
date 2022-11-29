@@ -17,7 +17,7 @@ import static org.mockito.Mockito.*;
 class ReplaySokobanGameTest {
 
     @DisplayName("Game's run method should spawn a new thread for rendering engine")
-    @Test
+    @RepeatedTest(50)
     @Tag(TestKind.PUBLIC)
     void testRenderingEngineThread() {
         final var gameState = mock(GameState.class);
@@ -44,7 +44,7 @@ class ReplaySokobanGameTest {
     }
 
     @DisplayName("Game's run method should spwan one thread for each input engine")
-    @Test
+    @RepeatedTest(10)
     @Tag(TestKind.PUBLIC)
     void testInputEngineThread() {
         final var gameState = mock(GameState.class);
@@ -101,7 +101,8 @@ class ReplaySokobanGameTest {
     }
 
     @DisplayName("Moves from the same input engine should be processed in the same order (multiple input engine)")
-    @Test
+    @RepeatedTest(100)
+    //@Test
     @Tag(TestKind.PUBLIC)
     void testMovesOrderMultiple() {
         final var gameState = mock(GameState.class);
@@ -139,8 +140,8 @@ class ReplaySokobanGameTest {
         final var game = spy(new TestGame(ReplaySokobanGame.Mode.ROUND_ROBIN, gameState, inputEngines, renderingEngine));
 
         final var actions0 = Arrays.<Action>asList(new Move.Down(0), new Move.Right(0), new Move.Left(0), new Move.Up(0), new Move.Down(0));
-        final var actions1 = Arrays.<Action>asList(new Move.Left(1), new Move.Right(1), new Move.Right(1), new Move.Up(1), new Move.Down(1));
-        final var actions2 = Arrays.<Action>asList(new Move.Left(2), new Move.Right(2), new Move.Right(2), new Move.Up(2), new Move.Down(2));
+        final var actions1 = Arrays.<Action>asList(new Move.Left(1), new Move.Right(1), new Move.Right(1), new Move.Up(1), new Move.Down(1), new Move.Down(1), new Move.Up(1));
+        final var actions2 = Arrays.<Action>asList(new Move.Left(2), new Move.Right(2), new Move.Right(2), new Move.Up(2), new Move.Down(2), new Move.Up(2));
         final var actionsLists = new List[]{actions0, actions1, actions2};
         final var processActions = new ActionList();
         when(inputEngine0.fetchAction()).thenAnswer(new RandomlyPausedActionProducer(actions0));
@@ -153,13 +154,15 @@ class ReplaySokobanGameTest {
         }).when(game).processAction(any());
 
         game.run();
-
+        System.out.println(processActions);
         int i = 0;
         while (i < actions0.size() && i < actions1.size()) {
+        //while (i < (actions0.size() + actions1.size() + actions2.size())) {
             final var round = i % inputEngines.size();
             final var index = i / inputEngines.size();
             final var actionList = actionsLists[round];
             if (index < actionList.size()) {
+                //System.out.println(actionList.get(index) + "   " + processActions.get(i));
                 assertEquals(actionList.get(index), processActions.get(i));
             }
             i++;
@@ -167,7 +170,7 @@ class ReplaySokobanGameTest {
     }
 
     @DisplayName("FPS parameter should specify the times render method is invoked per second")
-    @Test
+    @RepeatedTest(100)
     @Timeout(5)
     @Tag(TestKind.PUBLIC)
     void testFPS() {
