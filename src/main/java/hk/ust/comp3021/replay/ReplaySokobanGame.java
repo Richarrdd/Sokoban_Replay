@@ -11,7 +11,6 @@ import hk.ust.comp3021.game.RenderingEngine;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -161,7 +160,7 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
             // TODO: modify this method to implement the requirements.
             if (mode == Mode.FREE_RACE) {
                 while (!allExit()) {
-                    synchronized (nextID) {
+                    synchronized (exits) {
                         if (state.isWin()) {
                             exits.set(index, true);
                             //processAction(new Exit());
@@ -300,7 +299,6 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
             threadList.add(tempThread);
         }
 
-        Collections.shuffle(threadList);
         renderingEngineThread.start();
         for (Thread thread : threadList) {
             thread.start();
@@ -319,7 +317,7 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
             throw new RuntimeException(e);
         }
 
-       //System.out.println(actionList);
+       System.out.println(actionList);
         //System.out.println(exits);
     }
 
