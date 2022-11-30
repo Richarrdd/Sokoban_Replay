@@ -11,6 +11,7 @@ import hk.ust.comp3021.game.RenderingEngine;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -299,6 +300,7 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
             threadList.add(tempThread);
         }
 
+        Collections.shuffle(threadList);
         renderingEngineThread.start();
         for (Thread thread : threadList) {
             thread.start();
@@ -309,13 +311,12 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-
-        for (Thread thread : threadList) {
-            try {
+        try {
+            for (Thread thread : threadList) {
                 thread.join();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
             }
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
 
        //System.out.println(actionList);
