@@ -1,6 +1,7 @@
 package hk.ust.comp3021.replay;
 
 
+import hk.ust.comp3021.actions.Action;
 import hk.ust.comp3021.actions.ActionResult;
 import hk.ust.comp3021.actions.Exit;
 import hk.ust.comp3021.game.AbstractSokobanGame;
@@ -106,10 +107,11 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
     // TODO: add any method or field you need.
 
 
-    private static final AtomicInteger NEXTID = new AtomicInteger(0);
-    //private static int numOfInputEngines;
-    private static List<Boolean> exits = new ArrayList<>();
-    //private static ArrayList exits;
+    private final AtomicInteger nextID = new AtomicInteger(0);
+    //private int numOfInputEngines;
+    private List<Boolean> exits = new ArrayList<>();
+    private List<Action> actionList = new ArrayList<>();
+    //private ArrayList exits;
 
     private boolean allExit() {
         for (int i = 0; i < inputEngines.size(); i++) {
@@ -157,19 +159,28 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
         public void run() {
             // TODO: modify this method to implement the requirements.
             if (mode == Mode.FREE_RACE) {
-                while (!exits.get(index)) {
-                    synchronized (NEXTID) {
-                        final var action = inputEngine.fetchAction();
-                        if (action.getClass() != Exit.class) {
-                            final var result = processAction(action);
-                            if (result instanceof ActionResult.Failed failed) {
-                                renderingEngine.message(failed.getReason());
-                            }
-                        } else {
+                while (!allExit()) {
+                    synchronized (nextID) {
+                        if (state.isWin()) {
                             exits.set(index, true);
-                            final var result = processAction(action);
-                            if (result instanceof ActionResult.Failed failed) {
-                                renderingEngine.message(failed.getReason());
+                            //processAction(new Exit());
+                        } else {
+                            if (!exits.get(index)) {
+                                final var action = inputEngine.fetchAction();
+                                if (action.getClass() != Exit.class) {
+                                    final var result = processAction(action);
+                                    if (result instanceof ActionResult.Failed failed) {
+                                        renderingEngine.message(failed.getReason());
+                                    }
+                                    actionList.add(action);
+                                } else {
+                                    exits.set(index, true);
+                                    final var result = processAction(action);
+                                    if (result instanceof ActionResult.Failed failed) {
+                                        renderingEngine.message(failed.getReason());
+                                    }
+                                    actionList.add(action);
+                                }
                             }
                         }
                     }
@@ -180,39 +191,45 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
                 try {
                     while (!shouldStop() || !allExit()) {
                         //System.out.println("array = " + exits);
-                        synchronized (NEXTID) {
-                            while (NEXTID.get() != index && !allExit()) {
-                                NEXTID.wait();
+                        synchronized (nextID) {
+                            while (nextID.get() != index && !allExit()) {
+                                nextID.wait();
                             }
                         }
-
-                        final var action = inputEngine.fetchAction();
-                        if (action.getClass() != Exit.class) {
-                            final var result = processAction(action);
-                            if (result instanceof ActionResult.Failed failed) {
-                                renderingEngine.message(failed.getReason());
-                            }
-                        } else {
+                        if (state.isWin()) {
                             exits.set(index, true);
-                            //System.out.println("set index " + index + "true");
-                            final var result = processAction(action);
-                            if (result instanceof ActionResult.Failed failed) {
-                                renderingEngine.message(failed.getReason());
+                            //processAction(new Exit());
+                        } else {
+                            if (!exits.get(index)) {
+                                final var action = inputEngine.fetchAction();
+                                if (action.getClass() != Exit.class) {
+                                    final var result = processAction(action);
+                                    actionList.add(action);
+                                    if (result instanceof ActionResult.Failed failed) {
+                                        renderingEngine.message(failed.getReason());
+                                    }
+                                } else {
+                                    exits.set(index, true);
+                                    //System.out.println("set index " + index + "true");
+                                    final var result = processAction(action);
+                                    actionList.add(action);
+                                    if (result instanceof ActionResult.Failed failed) {
+                                        renderingEngine.message(failed.getReason());
+                                    }
+                                }
                             }
                         }
-
-
-                        synchronized (NEXTID) {
+                        synchronized (nextID) {
 
                             if (!allExit()) {
                                 int count = 1;
-                                while ((exits.get((NEXTID.get() + count) % inputEngines.size()))) {
+                                while ((exits.get((nextID.get() + count) % inputEngines.size()))) {
                                     count++;
                                 }
-                                //System.out.println("count = " + count + ", nextID = " + nextId);
-                                NEXTID.set((NEXTID.get() + count) % inputEngines.size());
+                                //System.out.println("count = " + count + ", nextID = " + nextID);
+                                nextID.set((nextID.get() + count) % inputEngines.size());
                             }
-                            NEXTID.notifyAll();
+                            nextID.notifyAll();
                         }
                     }
                 } catch (InterruptedException ignored) {
@@ -244,6 +261,7 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
                 renderingEngine.message(undoQuotaMessage);
                 renderingEngine.render(state);
                 //System.out.println(exits);
+                //System.out.println(actionList);
                 long start = System.currentTimeMillis();
                 long currentTime = System.currentTimeMillis();
                 while (currentTime - start < 1000/frameRate) {
@@ -270,7 +288,7 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
         RenderingEngineRunnable renderingEngine = new RenderingEngineRunnable();
         Thread renderingEngineThread = new Thread (renderingEngine);
         List<Thread> threadList = new ArrayList<>();
-        NEXTID.set(0);
+        nextID.set(0);
         exits.clear();
         //numOfInputEngines = inputEngines.size();
 
@@ -299,6 +317,9 @@ public class ReplaySokobanGame extends AbstractSokobanGame {
                 throw new RuntimeException(e);
             }
         }
+
+       //System.out.println(actionList);
+        //System.out.println(exits);
     }
 
 }
