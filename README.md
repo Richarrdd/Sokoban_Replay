@@ -1,17 +1,7 @@
-### Functionality Design
-
-Playing the game manually cannot fully utilize the power of multithreading since the game needs to wait for user inputs and most of the time is spent on waiting.
-Therefore, PA3 is designed to implement an automatic replay of the game.
-The `ReplaySokobanGame` class implement the most of the functionalities.
-Users of the program needs to specify a game map (as that in PA1) as well as one or more action files that contains the actions to be performed by each player.
-Then the replay game will start and automatically perform actions of each player concurrently until the game ends (either the game wins or all actions are performed).
-
-**Note that up to 26 players should be supported in PA3**
-
 As an example, consider the following arguments to the main method:
 
 ```
-java -jar Sokoban-PA3.jar 3 map02.map FREE_RACE 60 actions0.txt actions1.txt
+java -jar Sokoban.jar 3 map02.map FREE_RACE 60 actions0.txt actions1.txt
 ```
 It means that the game will take `map02.map` as `GameMap`.
 Suppose there are two players in the game map, `actions0.txt` and `actions1.txt` files specifies the actions of the two players, respectively.
@@ -121,10 +111,5 @@ In the example [above](#Functionality Design), the frameRate is set to 60, which
 - The `InputEngine` passed to `ReplaySokobanGame` is an instance of `StreamInputEngine` and `fetchAction` method will return the next action in the action file no matter whether there are `Exit` in the middle.
   If there are no more actions, `Exit` will be returned.
 
-## Reference Implementation
-
-We provide a reference implementation of the `ReplaySokobanGame` [here](https://course.cse.ust.hk/comp3021/assignments/Sokoban-proguard-PA3.jar).
-You it as follows:
-```bash
-java --enable-preview -jar Sokoban-proguard-PA3.jar 3 src/main/resources/map02.map ROUND_ROBIN 100 src/main/resources/actions/actions0.txt src/main/resources/actions/actions1.txt
+java --enable-preview -jar Sokoban-proguard.jar 3 src/main/resources/map02.map ROUND_ROBIN 100 src/main/resources/actions/actions0.txt src/main/resources/actions/actions1.txt
 ```
